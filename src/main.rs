@@ -1,116 +1,108 @@
-use crossterm::event::{
-    poll, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
-};
 use crossterm::{
-    cursor::position,
+    cursor,
     event::{
-        read, DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
-        EnableFocusChange, EnableMouseCapture, Event, KeyCode,
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+        KeyModifiers,
     },
-    execute, queue,
-    terminal::{disable_raw_mode, enable_raw_mode},
+    execute,
+    terminal::{self, disable_raw_mode, enable_raw_mode, ClearType},
+    ExecutableCommand,
 };
-use std::io;
-use std::time::Duration;
+use std::io::{self, Write};
 
-/**
- * This is how to make a multiline comment...
- * asdfasd
- * asdfsad
- * asdfas
- * df
- * dsaf
- */
-const HELP: &str = r#"Blocking read()
- - Keyboard, mouse, focus and terminal resize events enabled
- - Hit "c" to print current cursor position
- - Use Esc to quit
-"#;
+mod my_parser {
+    pub fn parse(string: String) -> String {
+        let mut result = String::new();
+        let params: Vec<String> = string.split(' ').map(|x| x.to_string()).collect();
+        for (i, p) in params.iter().enumerate() {
+            if p.contains(":") && i < params.len() - 1 {
+                result += &format!(
+                    "{}{{key: {:?}, value: {:?}}}",
+                    if i != 0 { ",\t" } else { "" },
+                    p.replace(":", ""),
+                    params[i + 1]
+                );
+            }
+        }
 
-fn print_events() -> io::Result<()> {
+        result
+    }
+}
+
+pub fn read_char() -> io::Result<()> {
+    let mut line = String::new();
+    print!("\r> ");
+    io::stdout().flush()?;
     loop {
-        // Blocking read
-        let event = read()?;
-
-        println!("Event: {:?}\r", event);
-
-        if event == Event::Key(KeyCode::Char('c').into()) {
-            println!("Cursor position: {:?}\r", position());
-        }
-
-        if let Event::Resize(x, y) = event {
-            let (original_size, new_size) = flush_resize_events((x, y));
-            println!("Resize from: {:?}, to: {:?}\r", original_size, new_size);
-        }
-
-        if event == Event::Key(KeyCode::Esc.into()) {
-            break;
+        match event::read() {
+            Err(..) => (),
+            Ok(event) => {
+                if let Event::Key(KeyEvent {
+                    code: KeyCode::Char(c),
+                    kind: KeyEventKind::Press,
+                    ..
+                }) = event
+                {
+                    line.push(c);
+                    print!("{}", c);
+                    io::stdout().flush()?;
+                } else if let Event::Key(KeyEvent {
+                    code: KeyCode::Enter,
+                    kind: KeyEventKind::Press,
+                    ..
+                }) = event
+                {
+                    let mut parse_result = my_parser::parse(line);
+                    if parse_result != "" {
+                        parse_result += "\n";
+                    }
+                    print!("\n\r{}\r> ", parse_result);
+                    line = String::new();
+                    io::stdout().flush()?;
+                } else if let Event::Key(KeyEvent {
+                    code: KeyCode::Esc, ..
+                }) = event
+                {
+                    break;
+                } else if let Event::Key(KeyEvent {
+                    code: KeyCode::Char('c'),
+                    kind: KeyEventKind::Release,
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                }) = event
+                {
+                    break;
+                } else if let Event::Key(KeyEvent {
+                    code: KeyCode::Char('l'),
+                    kind: KeyEventKind::Release,
+                    modifiers: KeyModifiers::CONTROL,
+                    ..
+                }) = event
+                {
+                    line = String::new();
+                    io::stdout().execute(cursor::MoveTo(0, 0))?;
+                    io::stdout().execute(terminal::Clear(ClearType::All))?;
+                    print!("\n\r> ");
+                    io::stdout().flush()?;
+                }
+            }
         }
     }
 
     Ok(())
 }
 
-// Resize events can occur in batches.
-// With a simple loop they can be flushed.
-// This function will keep the first and last resize event.
-fn flush_resize_events(first_resize: (u16, u16)) -> ((u16, u16), (u16, u16)) {
-    let mut last_resize = first_resize;
-    while let Ok(true) = poll(Duration::from_millis(50)) {
-        if let Ok(Event::Resize(x, y)) = read() {
-            last_resize = (x, y);
-        }
-    }
-
-    (first_resize, last_resize)
-}
-
 fn main() -> io::Result<()> {
-    println!("{}", HELP);
-
     enable_raw_mode()?;
 
     let mut stdout = io::stdout();
+    execute!(stdout, EnableMouseCapture)?;
 
-    let supports_keyboard_enhancement = matches!(
-        crossterm::terminal::supports_keyboard_enhancement(),
-        Ok(true)
-    );
-
-    if supports_keyboard_enhancement {
-        queue!(
-            stdout,
-            PushKeyboardEnhancementFlags(
-                KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                    | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
-                    | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS
-                    | KeyboardEnhancementFlags::REPORT_EVENT_TYPES
-            )
-        )?;
-    }
-
-    execute!(
-        stdout,
-        EnableBracketedPaste,
-        EnableFocusChange,
-        EnableMouseCapture,
-    )?;
-
-    if let Err(e) = print_events() {
+    if let Err(e) = read_char() {
         println!("Error: {:?}\r", e);
     }
 
-    if supports_keyboard_enhancement {
-        queue!(stdout, PopKeyboardEnhancementFlags)?;
-    }
-
-    execute!(
-        stdout,
-        DisableBracketedPaste,
-        PopKeyboardEnhancementFlags,
-        DisableFocusChange,
-        DisableMouseCapture
-    )?;
+    execute!(stdout, DisableMouseCapture)?;
 
     disable_raw_mode()
 }
