@@ -48,103 +48,274 @@ mod my_parser {
     }
 }
 
-pub fn read_char() -> io::Result<()> {
-    let mut line = String::new();
+struct Position {
+    x: u16,
+    y: u16,
+}
+impl Position {
+    pub fn x(&self) -> u16 {
+        self.x
+    }
+
+    pub fn y(&self) -> u16 {
+        self.y
+    }
+
+    pub fn left(&mut self) {
+        if self.x > 0 {
+            self.x -= 1;
+        }
+    }
+
+    pub fn down(&mut self) {
+        self.y += 1;
+    }
+}
+struct CurrentLine {
+    position: Position,
+    leftbuffer: String,
+    rightbuffer: String,
+}
+
+impl CurrentLine {
+    pub fn pop_left(&mut self) {
+        self.leftbuffer.pop();
+    }
+
+    pub fn collect(&self) -> String {
+        format!("{}{}", self.leftbuffer, self.rightbuffer)
+    }
+
+    pub fn clear(&mut self) {
+        self.set_position(2, self.position.y);
+        self.leftbuffer = String::new();
+        self.rightbuffer = String::new();
+    }
+
+    pub fn new(x: u16, y: u16) -> Self {
+        CurrentLine {
+            position: Position { x, y },
+            leftbuffer: String::new(),
+            rightbuffer: String::new(),
+        }
+    }
+
+    pub fn position_down(&mut self) {
+        self.position.down();
+    }
+
+    pub fn delete_left(&mut self) -> io::Result<()> {
+        self.leftbuffer.pop();
+        self.position.left();
+        Ok(())
+    }
+
+    pub fn delete_right(&mut self) -> io::Result<()> {
+        self.rightbuffer = self.rightbuffer.drain(1..).collect::<String>();
+
+        Ok(())
+    }
+
+    pub fn add_char(&mut self, c: char) -> io::Result<()> {
+        self.position.x += 1;
+        assert!(self.position.x >= 2);
+        self.leftbuffer.push(c);
+        self.display()
+    }
+
+    pub fn display(&self) -> io::Result<()> {
+        io::stdout().execute(cursor::MoveTo(2, self.position.y()))?;
+        io::stdout().execute(terminal::Clear(ClearType::UntilNewLine))?;
+        print!("\r> {}{}", self.leftbuffer, self.rightbuffer);
+        io::stdout().flush()?;
+        io::stdout().execute(cursor::MoveTo(self.position.x(), self.position.y()))?;
+
+        Ok(())
+    }
+
+    pub fn set_position(&mut self, x: u16, y: u16) {
+        self.position = Position { x, y };
+    }
+
+    pub fn update_position(&mut self, x: u16, y: u16) {
+        self.set_position(x, y);
+        let collection = self.collect();
+        let (leftbuffer, rightbuffer) = collection.split_at(x.into());
+        self.leftbuffer = leftbuffer.to_string();
+        self.rightbuffer = rightbuffer.to_string();
+    }
+}
+
+fn regular_character(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char(c),
+        kind: KeyEventKind::Press,
+        modifiers: KeyModifiers::NONE | KeyModifiers::SHIFT,
+        ..
+    }) = event
+    {
+        line.add_char(c.clone())?;
+    }
+
+    Ok(())
+}
+fn control_l(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('l'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::CONTROL,
+        ..
+    }) = event
+    {
+        line.clear();
+        io::stdout().execute(cursor::MoveTo(0, 0))?;
+        io::stdout().execute(terminal::Clear(ClearType::All))?;
+        print!("\r> ");
+        io::stdout().flush()?;
+        line.set_position(2, 0);
+    }
+
+    Ok(())
+}
+fn control_k(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('k'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::CONTROL,
+        ..
+    }) = event
+    {
+        match cursor::position() {
+            Ok((_, y)) => {
+                io::stdout().execute(cursor::MoveTo(2, y))?;
+                io::stdout().execute(terminal::Clear(ClearType::UntilNewLine))?;
+                /*                 print!("\r> ");
+                               io::stdout().flush()?;
+                */
+                line.update_position(0, y);
+                line.clear();
+                line.display()?;
+            }
+            _ => (),
+        }
+    }
+
+    Ok(())
+}
+fn control_a(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('a'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::CONTROL,
+        ..
+    }) = event
+    {
+        match cursor::position() {
+            Ok((_, y)) => {
+                io::stdout().execute(cursor::MoveTo(0, y))?;
+                io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
+                print!("\r> ");
+                io::stdout().flush()?;
+                line.update_position(2, y);
+                line.display()?;
+            }
+            _ => (),
+        }
+    }
+
+    Ok(())
+}
+fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Enter,
+        kind: KeyEventKind::Press,
+        ..
+    }) = event
+    {
+        let mut parse_result = String::new();
+        match my_parser::parse(line.collect()) {
+            Ok(s) => {
+                if s.contains("quit") {
+                    return Err(io::Error::from(io::ErrorKind::Interrupted));
+                } else if s != "" {
+                    parse_result = format!("{}\n", s);
+                } else {
+                    parse_result = format!("{}\n", "could not parse");
+                }
+            }
+            _ => (),
+        }
+
+        print!("\n\r{}\r> ", parse_result);
+        line.clear();
+        line.position_down();
+        if parse_result.contains("\n") {
+            line.position_down();
+        }
+        io::stdout().flush()?;
+    }
+
+    Ok(())
+}
+fn backspace(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Backspace,
+        kind: KeyEventKind::Press,
+        ..
+    }) = event
+    {
+        line.delete_left()?;
+        line.display()?;
+    }
+
+    Ok(())
+}
+fn control_c(event: &Event) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('c'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::CONTROL,
+        ..
+    }) = event
+    {
+        return Err(io::Error::from(io::ErrorKind::Interrupted));
+    }
+
+    Ok(())
+}
+
+fn prompt() -> io::Result<()> {
     print!("\r> ");
     io::stdout().flush()?;
+
+    Ok(())
+}
+
+pub fn read_char() -> io::Result<()> {
+    prompt()?;
+
+    let (x, y) = match cursor::position() {
+        Ok((_x, _y)) => (_x, _y),
+        _ => (2, 0),
+    };
+    let mut line = CurrentLine::new(x, y);
+
     loop {
         match event::read() {
             Err(..) => (),
             Ok(event) => {
-                if let Event::Key(KeyEvent {
-                    code: KeyCode::Char(c),
-                    kind: KeyEventKind::Press,
-                    ..
-                }) = event
-                {
-                    line.push(c);
-                    print!("{}", c);
-                    io::stdout().flush()?;
-                } else if let Event::Key(KeyEvent {
-                    code: KeyCode::Enter,
-                    kind: KeyEventKind::Press,
-                    ..
-                }) = event
-                {
-                    let mut parse_result = String::new();
-                    match my_parser::parse(line) {
-                        Ok(s) => {
-                            if s.contains("quit") {
-                                break;
-                            } else if s != "" {
-                                parse_result = format!("{}\n", s);
-                            }
-                        }
-                        _ => (),
-                    }
-
-                    print!("\n\r{}\r> ", parse_result);
-                    line = String::new();
-                    io::stdout().flush()?;
-                } else if let Event::Key(KeyEvent {
-                    code: KeyCode::Esc, ..
-                }) = event
-                {
-                    break;
-                } else if let Event::Key(KeyEvent {
-                    code: KeyCode::Backspace,
-                    ..
-                }) = event
-                {
-                    match cursor::position() {
-                        Ok((x, _)) => {
-                            if x > 2 {
-                                io::stdout().execute(cursor::MoveLeft(1))?;
-                                io::stdout().execute(terminal::Clear(ClearType::UntilNewLine))?;
-                                if line.len() != 0 {
-                                    line.pop();
-                                }
-                            }
-                        }
-                        _ => (),
-                    }
-                } else if let Event::Key(KeyEvent {
-                    code: KeyCode::Char('c'),
-                    kind: KeyEventKind::Release,
-                    modifiers: KeyModifiers::CONTROL,
-                    ..
-                }) = event
-                {
-                    break;
-                } else if let Event::Key(KeyEvent {
-                    code: KeyCode::Char('l'),
-                    kind: KeyEventKind::Release,
-                    modifiers: KeyModifiers::CONTROL,
-                    ..
-                }) = event
-                {
-                    line = String::new();
-                    io::stdout().execute(cursor::MoveTo(0, 0))?;
-                    io::stdout().execute(terminal::Clear(ClearType::All))?;
-                    print!("\n\r> ");
-                    io::stdout().flush()?;
-                } else if let Event::Key(KeyEvent {
-                    code: KeyCode::Char('a'),
-                    kind: KeyEventKind::Release,
-                    modifiers: KeyModifiers::CONTROL,
-                    ..
-                }) = event
-                {
-                    line = String::new();
-                    match cursor::position() {
-                        Ok((_, y)) => {
-                            io::stdout().execute(cursor::MoveTo(0, y))?;
-                            io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
-                            print!("\r> ");
-                            io::stdout().flush()?;
-                        }
-                        _ => (),
-                    }
+                regular_character(&event, &mut line)?;
+                backspace(&event, &mut line)?;
+                control_k(&event, &mut line)?;
+                control_l(&event, &mut line)?;
+                control_a(&event, &mut line)?;
+                match parse_line(&event, &mut line) {
+                    Err(..) => break,
+                    _ => (),
+                }
+                match control_c(&event) {
+                    Err(..) => break,
+                    _ => (),
                 }
             }
         }
