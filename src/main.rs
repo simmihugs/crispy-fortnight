@@ -1,3 +1,6 @@
+mod currentline;
+mod my_parser;
+
 use crossterm::{
     cursor,
     event::{
@@ -8,145 +11,8 @@ use crossterm::{
     terminal::{self, disable_raw_mode, enable_raw_mode, ClearType},
     ExecutableCommand,
 };
+use currentline::CurrentLine;
 use std::io::{self, Write};
-
-mod my_parser {
-    use std::io::*;
-
-    pub fn print_help() -> Result<()> {
-        print!("\nHelp!");
-        stdout().flush()?;
-
-        Ok(())
-    }
-
-    pub fn parse(string: String) -> Result<String> {
-        if string == ":h" {
-            match print_help() {
-                _ => (),
-            }
-
-            Ok("help".to_string())
-        } else if string.contains(":quit") || string.contains(":q") {
-            Ok("quit".to_string())
-        } else {
-            let mut result = String::new();
-            let params: Vec<String> = string.split(' ').map(|x| x.to_string()).collect();
-            for (i, p) in params.iter().enumerate() {
-                if p.contains(":") && i < params.len() - 1 {
-                    result += &format!(
-                        "{}{{key: {:?}, value: {:?}}}",
-                        if i != 0 { ",\t" } else { "" },
-                        p.replace(":", ""),
-                        params[i + 1]
-                    );
-                }
-            }
-
-            Ok(result)
-        }
-    }
-}
-
-struct Position {
-    x: u16,
-    y: u16,
-}
-impl Position {
-    pub fn x(&self) -> u16 {
-        self.x
-    }
-
-    pub fn y(&self) -> u16 {
-        self.y
-    }
-
-    pub fn left(&mut self) {
-        if self.x > 0 {
-            self.x -= 1;
-        }
-    }
-
-    pub fn down(&mut self) {
-        self.y += 1;
-    }
-}
-struct CurrentLine {
-    position: Position,
-    leftbuffer: String,
-    rightbuffer: String,
-}
-
-impl CurrentLine {
-    #[allow(dead_code)]
-    pub fn pop_left(&mut self) {
-        self.leftbuffer.pop();
-    }
-
-    pub fn collect(&self) -> String {
-        format!("{}{}", self.leftbuffer, self.rightbuffer)
-    }
-
-    pub fn clear(&mut self) {
-        self.set_position(2, self.position.y);
-        self.leftbuffer = String::new();
-        self.rightbuffer = String::new();
-    }
-
-    pub fn new(x: u16, y: u16) -> Self {
-        CurrentLine {
-            position: Position { x, y },
-            leftbuffer: String::new(),
-            rightbuffer: String::new(),
-        }
-    }
-
-    pub fn position_down(&mut self) {
-        self.position.down();
-    }
-
-    pub fn delete_left(&mut self) -> io::Result<()> {
-        self.leftbuffer.pop();
-        self.position.left();
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    pub fn delete_right(&mut self) -> io::Result<()> {
-        self.rightbuffer = self.rightbuffer.drain(1..).collect::<String>();
-
-        Ok(())
-    }
-
-    pub fn add_char(&mut self, c: char) -> io::Result<()> {
-        self.position.x += 1;
-        assert!(self.position.x >= 2);
-        self.leftbuffer.push(c);
-        self.display()
-    }
-
-    pub fn display(&self) -> io::Result<()> {
-        io::stdout().execute(cursor::MoveTo(2, self.position.y()))?;
-        io::stdout().execute(terminal::Clear(ClearType::UntilNewLine))?;
-        print!("\r> {}{}", self.leftbuffer, self.rightbuffer);
-        io::stdout().flush()?;
-        io::stdout().execute(cursor::MoveTo(self.position.x(), self.position.y()))?;
-
-        Ok(())
-    }
-
-    pub fn set_position(&mut self, x: u16, y: u16) {
-        self.position = Position { x, y };
-    }
-
-    pub fn update_position(&mut self, x: u16, y: u16) {
-        self.set_position(x, y);
-        let collection = self.collect();
-        let (leftbuffer, rightbuffer) = collection.split_at(x.into());
-        self.leftbuffer = leftbuffer.to_string();
-        self.rightbuffer = rightbuffer.to_string();
-    }
-}
 
 fn regular_character(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     if let Event::Key(KeyEvent {
@@ -191,9 +57,6 @@ fn control_k(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
             Ok((_, y)) => {
                 io::stdout().execute(cursor::MoveTo(2, y))?;
                 io::stdout().execute(terminal::Clear(ClearType::UntilNewLine))?;
-                /*                 print!("\r> ");
-                               io::stdout().flush()?;
-                */
                 line.update_position(0, y);
                 line.clear();
                 line.display()?;
@@ -285,14 +148,12 @@ fn control_c(event: &Event) -> io::Result<()> {
 
     Ok(())
 }
-
 fn prompt() -> io::Result<()> {
     print!("\r> ");
     io::stdout().flush()?;
 
     Ok(())
 }
-
 pub fn read_char() -> io::Result<()> {
     io::stdout().execute(cursor::SetCursorStyle::BlinkingBlock)?;
     println!("Welcome to the crispy repl {}!", "😁");
@@ -303,7 +164,6 @@ pub fn read_char() -> io::Result<()> {
         _ => (2, 0),
     };
     let mut line = CurrentLine::new(x, y);
-
 
     loop {
         match event::read() {
@@ -342,6 +202,6 @@ fn main() -> io::Result<()> {
     io::stdout().execute(cursor::SetCursorStyle::DefaultUserShape)?;
     execute!(stdout, DisableMouseCapture)?;
     println!("Bye {}!", "😁");
-    
+
     disable_raw_mode()
 }
