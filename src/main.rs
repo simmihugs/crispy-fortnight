@@ -8,7 +8,7 @@ use crossterm::{
     terminal::{self, disable_raw_mode, enable_raw_mode, ClearType},
     ExecutableCommand,
 };
-use std::io::{self, stdout, Write};
+use std::io::{self, Write};
 
 mod my_parser {
     use std::io::*;
@@ -78,6 +78,7 @@ struct CurrentLine {
 }
 
 impl CurrentLine {
+    #[allow(dead_code)]
     pub fn pop_left(&mut self) {
         self.leftbuffer.pop();
     }
@@ -110,6 +111,7 @@ impl CurrentLine {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn delete_right(&mut self) -> io::Result<()> {
         self.rightbuffer = self.rightbuffer.drain(1..).collect::<String>();
 
@@ -292,6 +294,8 @@ fn prompt() -> io::Result<()> {
 }
 
 pub fn read_char() -> io::Result<()> {
+    io::stdout().execute(cursor::SetCursorStyle::BlinkingBlock)?;
+    println!("Welcome to the crispy repl {}!", "😁");
     prompt()?;
 
     let (x, y) = match cursor::position() {
@@ -299,6 +303,7 @@ pub fn read_char() -> io::Result<()> {
         _ => (2, 0),
     };
     let mut line = CurrentLine::new(x, y);
+
 
     loop {
         match event::read() {
@@ -334,7 +339,9 @@ fn main() -> io::Result<()> {
         println!("Error: {:?}\r", e);
     }
 
+    io::stdout().execute(cursor::SetCursorStyle::DefaultUserShape)?;
     execute!(stdout, DisableMouseCapture)?;
-
+    println!("Bye {}!", "😁");
+    
     disable_raw_mode()
 }
