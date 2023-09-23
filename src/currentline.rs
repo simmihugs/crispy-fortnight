@@ -40,6 +40,10 @@ impl CurrentLine {
         self.leftbuffer.pop();
     }
 
+    pub fn left(&mut self) {
+        self.position.left();
+    }
+
     pub fn collect(&self) -> String {
         format!("{}{}", self.leftbuffer, self.rightbuffer)
     }

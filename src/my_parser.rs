@@ -12,7 +12,6 @@ struct CommandMap {
     key: String,
     arg: Vec<String>,
 }
-
 impl CommandMap {
     fn new(name: &str) -> Self {
         Self {
@@ -22,14 +21,17 @@ impl CommandMap {
     }
 
     fn add(&mut self, value: &str) {
-        self.arg.push(String::from(value));
+        let tmp = String::from(value.trim());
+        if tmp != "" {
+            self.arg.push(tmp);
+        }
     }
 
     fn to_string(&self) -> String {
         if self.arg.len() == 0 {
             format!("{{key: {}}}", self.key)
         } else {
-            let args: String = self.arg.iter().fold(String::from(" "), |mut acc, value| {
+            let args: String = self.arg.iter().fold(String::from(""), |mut acc, value| {
                 acc += &value;
                 acc += " ";
                 acc
@@ -43,7 +45,6 @@ impl CommandMap {
         }
     }
 }
-
 pub fn parse(string: String) -> Result<String, String> {
     if string == ":h" {
         match print_help() {
