@@ -99,16 +99,14 @@ fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     {
         let mut parse_result = String::new();
         match my_parser::parse(line.collect()) {
-            Ok(s) => {
-                if s.contains("quit") {
+            Err(result) => {
+                if result == "quit" {
                     return Err(io::Error::from(io::ErrorKind::Interrupted));
-                } else if s != "" {
-                    parse_result = format!("{}\n", s);
-                } else {
-                    parse_result = format!("{}\n", "could not parse");
                 }
             }
-            _ => (),
+            Ok(s) => {
+                parse_result = format!("{}\n", s);
+            }
         }
 
         print!("\n\r{}\r> ", parse_result);
@@ -119,7 +117,6 @@ fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         }
         io::stdout().flush()?;
     }
-
     Ok(())
 }
 fn backspace(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
