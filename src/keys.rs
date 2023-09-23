@@ -1,4 +1,5 @@
 use super::currentline::CurrentLine;
+use super::debug::debug_line;
 use super::my_parser;
 use crossterm::{
     cursor,
@@ -69,6 +70,7 @@ fn control_a(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
+        debug_line(line)?;
         match cursor::position() {
             Ok((_, y)) => {
                 io::stdout().execute(cursor::MoveTo(0, y))?;
@@ -77,6 +79,7 @@ fn control_a(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
                 io::stdout().flush()?;
                 line.update_position(2, y);
                 line.display()?;
+                debug_line(line)?;
             }
             _ => (),
         }
@@ -92,6 +95,7 @@ fn control_b(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
+        debug_line(line)?;
         match cursor::position() {
             Ok((x, y)) => {
                 if x > 2 {
@@ -101,12 +105,38 @@ fn control_b(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
                     io::stdout().flush()?;
                     line.left();
                     line.display()?;
+                    debug_line(line)?;
                 }
             }
             _ => (),
         }
     }
-
+    Ok(())
+}
+fn control_f(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('f'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::CONTROL,
+        ..
+    }) = event
+    {
+        debug_line(line)?;
+        match cursor::position() {
+            Ok((x, y)) => {
+                if x > 2 {
+                    io::stdout().execute(cursor::MoveTo(x + 1, y))?;
+                    io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
+                    print!("\r> ");
+                    io::stdout().flush()?;
+                    line.right();
+                    line.display()?;
+                    debug_line(line)?;
+                }
+            }
+            _ => (),
+        }
+    }
     Ok(())
 }
 fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
@@ -191,6 +221,7 @@ pub fn read_char() -> io::Result<()> {
                 control_l(&event, &mut line)?;
                 control_a(&event, &mut line)?;
                 control_b(&event, &mut line)?;
+                control_f(&event, &mut line)?;
                 match parse_line(&event, &mut line) {
                     Err(..) => break,
                     _ => (),

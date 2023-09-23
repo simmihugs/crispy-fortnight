@@ -1,4 +1,5 @@
 mod currentline;
+mod debug;
 mod keys;
 mod my_parser;
 
@@ -21,6 +22,8 @@ fn main() -> io::Result<()> {
     if let Err(e) = read_char() {
         println!("Error: {:?}\r", e);
     }
+
+    debug::debug_clear()?;
 
     io::stdout().execute(cursor::SetCursorStyle::DefaultUserShape)?;
     execute!(stdout, DisableMouseCapture)?;

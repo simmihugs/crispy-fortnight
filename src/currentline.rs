@@ -1,3 +1,4 @@
+use super::debug;
 use crossterm::{
     cursor,
     terminal::{self, ClearType},
@@ -5,6 +6,7 @@ use crossterm::{
 };
 use std::io::{self, Write};
 
+#[derive(Debug)]
 struct Position {
     x: u16,
     y: u16,
@@ -24,11 +26,16 @@ impl Position {
         }
     }
 
+    pub fn right(&mut self) {
+        self.x += 1;
+    }
+
     pub fn down(&mut self) {
         self.y += 1;
     }
 }
 
+#[derive(Debug)]
 pub struct CurrentLine {
     position: Position,
     leftbuffer: String,
@@ -38,6 +45,20 @@ impl CurrentLine {
     #[allow(dead_code)]
     pub fn pop_left(&mut self) {
         self.leftbuffer.pop();
+    }
+
+    pub fn right(&mut self) {
+        if self.rightbuffer != "" {
+            match debug::debug_message("go right") {
+                _ => (),
+            }
+
+            self.position.right();
+        } else {
+            match debug::debug_message("cannot go right") {
+                _ => (),
+            }
+        }
     }
 
     pub fn left(&mut self) {
