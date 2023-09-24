@@ -1,5 +1,5 @@
 use super::currentline::CurrentLine;
-use super::debug::debug_line;
+use super::debug::{debug_event, debug_line, debug_message};
 use super::my_parser;
 use crossterm::{
     cursor,
@@ -96,6 +96,7 @@ fn control_b(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     }) = event
     {
         debug_line(line)?;
+        debug_event(event)?;
         match cursor::position() {
             Ok((x, y)) => {
                 if x > 2 {
@@ -122,6 +123,8 @@ fn control_f(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     }) = event
     {
         debug_line(line)?;
+        debug_event(event)?;
+        debug_message("CTRL-f")?;
         match cursor::position() {
             Ok((x, y)) => {
                 if x > 2 {
