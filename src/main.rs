@@ -14,6 +14,10 @@ use keys::read_char;
 use std::io;
 
 fn main() -> io::Result<()> {
+    let x = match cursor::position() {
+        Ok((x, _)) => x,
+        _ => 0,
+    };
     enable_raw_mode()?;
 
     let mut stdout = io::stdout();
@@ -23,11 +27,21 @@ fn main() -> io::Result<()> {
         println!("Error: {:?}\r", e);
     }
 
+    let (xp, yp) = match cursor::position() {
+        Ok((x, y)) => (x, y),
+        _ => (0, 0),
+    };
+    println!("\rBye {}!", "😁");
     debug::debug_clear()?;
 
     io::stdout().execute(cursor::SetCursorStyle::DefaultUserShape)?;
     execute!(stdout, DisableMouseCapture)?;
-    println!("Bye {}!", "😁");
+
+    if x == 0 {
+        io::stdout().execute(cursor::MoveTo(xp, yp))?;
+    } else {
+        io::stdout().execute(cursor::MoveTo(x, yp))?;
+    }
 
     disable_raw_mode()
 }

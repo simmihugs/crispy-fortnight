@@ -59,8 +59,6 @@ impl CurrentLine {
     }
 
     pub fn clear(&mut self) {
-        //self.set_position(2, self.position.y);
-        //self.position.set_x(0);
         self.leftbuffer = String::new();
         self.rightbuffer = String::new();
     }

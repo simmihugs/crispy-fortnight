@@ -247,6 +247,7 @@ fn control_d(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     }
     Ok(())
 }
+
 // MOD/ALT
 fn alt_b(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     if let Event::Key(KeyEvent {
@@ -303,7 +304,6 @@ fn alt_d(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     }
     Ok(())
 }
-
 pub fn read_char() -> io::Result<()> {
     io::stdout().execute(cursor::SetCursorStyle::BlinkingBlock)?;
     println!("Welcome to the crispy repl {}!", "😁");
