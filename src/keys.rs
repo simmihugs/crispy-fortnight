@@ -9,6 +9,7 @@ use crossterm::{
 };
 use std::io::{self, Write};
 
+// REGULAR CHARS
 fn regular_character(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     if let Event::Key(KeyEvent {
         code: KeyCode::Char(c),
@@ -24,6 +25,8 @@ fn regular_character(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
 
     Ok(())
 }
+
+// CTRL
 fn control_l(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     if let Event::Key(KeyEvent {
         code: KeyCode::Char('l'),
@@ -90,7 +93,7 @@ fn control_e(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     }) = event
     {
         line.set_position_end();
-        io::stdout().execute(cursor::MoveTo(line.length() as u16, line.position.y()))?;
+        io::stdout().execute(cursor::MoveTo(2 + line.length() as u16, line.position.y()))?;
         debug_line(line)?;
         debug_event(event)?;
     }
@@ -181,11 +184,14 @@ fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
             parse_result = String::from("Could not parse\n");
         }
         print!("\n\r{}\r> ", parse_result);
+
         line.clear();
         line.position_down();
+        line.set_position_start_x();
         if parse_result.contains("\n") {
             line.position_down();
         }
+        io::stdout().execute(cursor::MoveTo(2, line.position.y()))?;
         debug_line(line)?;
         debug_event(event)?;
         io::stdout().flush()?;
@@ -226,6 +232,33 @@ fn prompt() -> io::Result<()> {
 
     Ok(())
 }
+
+// MOD/ALT
+fn alt_b(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('b'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::ALT,
+        ..
+    }) = event
+    {
+        match line.left_word() {
+            None => debug_message("Could not move back word")?,
+            Some(x) => {
+                if x == 0 {
+                    line.set_position_x(x);
+                    io::stdout().execute(cursor::MoveTo(x + 2, line.position.y()))?;
+                } else {
+                    line.set_position_x(x + 1);
+                    io::stdout().execute(cursor::MoveTo(x + 1, line.position.y()))?;
+                }
+                debug_message("Moved back word")?;
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn read_char() -> io::Result<()> {
     io::stdout().execute(cursor::SetCursorStyle::BlinkingBlock)?;
     println!("Welcome to the crispy repl {}!", "😁");
@@ -243,6 +276,7 @@ pub fn read_char() -> io::Result<()> {
             Ok(event) => {
                 regular_character(&event, &mut line)?;
                 backspace(&event, &mut line)?;
+                alt_b(&event, &mut line)?;
                 control_k(&event, &mut line)?;
                 control_l(&event, &mut line)?;
                 control_a(&event, &mut line)?;

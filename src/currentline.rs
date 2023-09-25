@@ -6,6 +6,8 @@ use crossterm::{
 };
 use std::io::{self, Write};
 
+use crate::debug::debug_message;
+
 #[derive(Debug)]
 pub struct Position {
     x: u16,
@@ -145,6 +147,14 @@ impl CurrentLine {
         self.rightbuffer = String::new();
     }
 
+    pub fn set_position_x(&mut self, x: u16) {
+        let collection = self.collect();
+        let (left, right) = collection.split_at(x.into());
+        self.leftbuffer = left.to_string();
+        self.rightbuffer = right.to_string();
+        self.position.set_x(x);
+    }
+
     pub fn move_left(&mut self) -> bool {
         if self.position.x == 0 {
             false
@@ -172,6 +182,24 @@ impl CurrentLine {
             self.leftbuffer = leftbuffer.to_string();
             self.rightbuffer = rightbuffer.to_string();
             true
+        }
+    }
+
+    pub fn left_word(&self) -> Option<u16> {
+        if self.position.x() == 0 {
+            None
+        } else {
+            let substring = self
+                .collect()
+                .drain(0..self.position.x as usize)
+                .collect::<String>()
+                .trim()
+                .to_string();
+
+            match substring.rfind(' ') {
+                None => Some(0),
+                Some(index) => Some(2 + index as u16),
+            }
         }
     }
 }
