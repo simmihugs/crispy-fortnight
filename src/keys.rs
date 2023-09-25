@@ -176,17 +176,18 @@ fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
                 debug_message("Quit")?;
                 return Err(io::Error::from(io::ErrorKind::Interrupted));
             }
-            my_parser::Command::Invaid => {
+            my_parser::Command::Invalid => {
                 debug_message("Invalid")?;
-                if parse_result.trim() == "" {
-                    parse_result = String::from("Could not parse\n");
-                }
+                parse_result = String::from("Could not parse\n");
             }
             my_parser::Command::Load(file) => {
                 debug_message(file.as_str())?;
                 if parse_result.trim() == "" {
                     parse_result = format!("{}\n", file);
                 }
+            }
+            my_parser::Command::Command(_command) => {
+                parse_result = String::from("Could not parse\n");
             }
         }
         print!("\n\r{}\r> ", parse_result);

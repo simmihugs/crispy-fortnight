@@ -13,7 +13,8 @@ pub enum Command {
     Help,
     Quit,
     Load(String),
-    Invaid,
+    Invalid,
+    Command(Box<Command>),
 }
 
 #[derive(Debug)]
@@ -101,7 +102,7 @@ pub fn parse(string: String) -> Command {
             });
 
         if result == "" {
-            Command::Invaid
+            Command::Invalid
         } else {
             Command::Load(result)
         }
