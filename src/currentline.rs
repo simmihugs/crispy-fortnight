@@ -1,12 +1,9 @@
-//use super::debug;
 use crossterm::{
     cursor,
     terminal::{self, ClearType},
     ExecutableCommand,
 };
 use std::io::{self, Write};
-
-use crate::debug::debug_message;
 
 #[derive(Debug)]
 pub struct Position {
