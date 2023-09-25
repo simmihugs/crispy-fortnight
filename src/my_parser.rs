@@ -1,7 +1,9 @@
+use super::debug::debug_message;
 use std::io::{self, Write};
 
 pub fn print_help() -> io::Result<()> {
     print!("\nHelp!");
+    debug_message("Print Help!")?;
     io::stdout().flush()?;
 
     Ok(())
@@ -52,6 +54,9 @@ pub fn parse(string: String) -> Result<String, String> {
         }
         Err(String::from("help"))
     } else if string.contains(":quit") || string.contains(":q") {
+        match debug_message("Quit!") {
+            _ => (),
+        }
         Err(String::from("quit"))
     } else {
         let mut keys: Vec<CommandMap> = Vec::new();

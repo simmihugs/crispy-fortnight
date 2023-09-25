@@ -124,7 +124,6 @@ fn control_f(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     {
         debug_line(line)?;
         debug_event(event)?;
-        debug_message("CTRL-f")?;
         match cursor::position() {
             Ok((x, y)) => {
                 if x > 2 {
@@ -149,16 +148,22 @@ fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
-        let mut parse_result = String::new();
+        let mut parse_result = String::from("");
         match my_parser::parse(line.collect()) {
             Err(result) => {
                 if result == "quit" {
+                    debug_message("Quit")?;
                     return Err(io::Error::from(io::ErrorKind::Interrupted));
+                } else {
+                    parse_result = result;
                 }
             }
             Ok(s) => {
                 parse_result = format!("{}\n", s);
             }
+        }
+        if parse_result.trim() == "" {
+            parse_result = String::from("Could not parse\n");
         }
 
         print!("\n\r{}\r> ", parse_result);
