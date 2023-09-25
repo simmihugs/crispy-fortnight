@@ -9,6 +9,13 @@ pub fn print_help() -> io::Result<()> {
     Ok(())
 }
 
+pub enum Command {
+    Help,
+    Quit,
+    Load(String),
+    Invaid,
+}
+
 #[derive(Debug)]
 struct CommandMap {
     key: String,
@@ -47,17 +54,11 @@ impl CommandMap {
         }
     }
 }
-pub fn parse(string: String) -> Result<String, String> {
+pub fn parse(string: String) -> Command {
     if string == ":h" {
-        match print_help() {
-            _ => (),
-        }
-        Err(String::from("help"))
+        Command::Help
     } else if string.contains(":quit") || string.contains(":q") {
-        match debug_message("Quit!") {
-            _ => (),
-        }
-        Err(String::from("quit"))
+        Command::Quit
     } else {
         let mut keys: Vec<CommandMap> = Vec::new();
         string
@@ -99,6 +100,10 @@ pub fn parse(string: String) -> Result<String, String> {
                 acc
             });
 
-        Ok(result)
+        if result == "" {
+            Command::Invaid
+        } else {
+            Command::Load(result)
+        }
     }
 }

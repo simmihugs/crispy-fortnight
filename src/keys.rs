@@ -166,31 +166,35 @@ fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     }) = event
     {
         let mut parse_result = String::from("");
+
         match my_parser::parse(line.collect()) {
-            Err(result) => {
-                if result == "quit" {
-                    parse_result += "";
-                    debug_message("Quit")?;
-                    return Err(io::Error::from(io::ErrorKind::Interrupted));
-                } else {
-                    parse_result = result;
+            my_parser::Command::Help => {
+                my_parser::print_help()?;
+                debug_message("Help")?;
+            }
+            my_parser::Command::Quit => {
+                debug_message("Quit")?;
+                return Err(io::Error::from(io::ErrorKind::Interrupted));
+            }
+            my_parser::Command::Invaid => {
+                debug_message("Invalid")?;
+                if parse_result.trim() == "" {
+                    parse_result = String::from("Could not parse\n");
                 }
             }
-            Ok(s) => {
-                parse_result = format!("{}\n", s);
+            my_parser::Command::Load(file) => {
+                debug_message(file.as_str())?;
+                if parse_result.trim() == "" {
+                    parse_result = format!("{}\n", file);
+                }
             }
-        }
-        if parse_result.trim() == "" {
-            parse_result = String::from("Could not parse\n");
         }
         print!("\n\r{}\r> ", parse_result);
 
         line.clear();
         line.position_down();
+        line.position_down();
         line.set_position_start_x();
-        if parse_result.contains("\n") {
-            line.position_down();
-        }
         io::stdout().execute(cursor::MoveTo(2, line.position.y()))?;
         debug_line(line)?;
         debug_event(event)?;

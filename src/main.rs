@@ -7,7 +7,7 @@ use crossterm::{
     cursor,
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode},
+    terminal::{self, disable_raw_mode, enable_raw_mode, ClearType},
     ExecutableCommand,
 };
 use keys::read_char;
@@ -31,6 +31,7 @@ fn main() -> io::Result<()> {
         Ok((x, y)) => (x, y),
         _ => (0, 0),
     };
+    io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
     println!("\rBye {}!", "😁");
     debug::debug_clear()?;
 
