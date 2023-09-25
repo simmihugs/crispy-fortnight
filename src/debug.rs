@@ -14,7 +14,12 @@ pub fn debug_message(message: &str) -> io::Result<()> {
     match cursor::position() {
         Ok((x, y)) => match terminal::size() {
             Ok((width, height)) => {
-                let local_message = format!("DEBUG: message: {}", message);
+                let mut local_message = format!("DEBUG: message: {}", message);
+                if local_message.len() > width as usize - 1 {
+                    local_message = local_message
+                        .drain(0..width as usize - 1)
+                        .collect::<String>();
+                }
                 io::stdout().execute(cursor::MoveTo(0, height - 3))?;
                 io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
                 io::stdout().execute(style::SetBackgroundColor(style::Color::Cyan))?;
@@ -36,7 +41,10 @@ pub fn debug_event(event: &Event) -> io::Result<()> {
     match cursor::position() {
         Ok((x, y)) => match terminal::size() {
             Ok((width, height)) => {
-                let message = format!("DEBUG: event: {:?}", event);
+                let mut message = format!("DEBUG: event: {:?}", event);
+                if message.len() > width as usize - 1 {
+                    message = message.drain(0..width as usize - 1).collect::<String>();
+                }
                 io::stdout().execute(cursor::MoveTo(0, height - 2))?;
                 io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
                 io::stdout().execute(style::SetBackgroundColor(style::Color::Green))?;
@@ -57,7 +65,10 @@ pub fn debug_line(line: &mut CurrentLine) -> io::Result<()> {
     match cursor::position() {
         Ok((x, y)) => match terminal::size() {
             Ok((width, height)) => {
-                let message = format!("DEBUG: currentline {:?}", line);
+                let mut message = format!("DEBUG: currentline {:?}", line);
+                if message.len() > width as usize - 1 {
+                    message = message.drain(0..width as usize - 1).collect::<String>();
+                }
                 io::stdout().execute(cursor::MoveTo(0, height - 1))?;
                 io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
                 io::stdout().execute(style::SetBackgroundColor(style::Color::Magenta))?;
