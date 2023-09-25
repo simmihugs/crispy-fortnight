@@ -54,24 +54,6 @@ impl CurrentLine {
         self.leftbuffer.pop();
     }
 
-    /*     pub fn right(&mut self) {
-        if self.rightbuffer != "" {
-            match debug::debug_message("go right") {
-                _ => (),
-            }
-
-            self.position.move_right();
-        } else {
-            match debug::debug_message("cannot go right") {
-                _ => (),
-            }
-        }
-    } */
-
-    /*     pub fn left(&mut self) {
-        self.position.move_left();
-    } */
-
     pub fn collect(&self) -> String {
         format!("{}{}", self.leftbuffer, self.rightbuffer)
     }
@@ -95,17 +77,18 @@ impl CurrentLine {
         self.position.down();
     }
 
-    pub fn delete_left(&mut self) -> io::Result<()> {
+    pub fn delete_left(&mut self) {
         self.leftbuffer.pop();
         self.position.move_left();
-        Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn delete_right(&mut self) -> io::Result<()> {
-        self.rightbuffer = self.rightbuffer.drain(1..).collect::<String>();
-
-        Ok(())
+    pub fn delete_right(&mut self) {
+        if self.rightbuffer.len() > 0 {
+            self.rightbuffer = self.rightbuffer.drain(1..).collect::<String>();
+            super::debug::debug_message("Delete one character from right buffer").unwrap();
+        } else {
+            super::debug::debug_message("Right buffer empty").unwrap();
+        }
     }
 
     pub fn add_char(&mut self, c: char) -> io::Result<()> {
@@ -182,21 +165,98 @@ impl CurrentLine {
         }
     }
 
+    pub fn delete_word_right(&mut self) {
+        if self.rightbuffer.len() > 0 {
+            match self.rightbuffer.find(' ') {
+                Some(index) => {
+                    let mut real_index = index;
+                    while real_index < self.rightbuffer.len() {
+                        if self.rightbuffer.chars().nth(real_index) != Some(' ') {
+                            break;
+                        }
+                        real_index += 1;
+                    }
+                    super::debug::debug_message(
+                        format!("found space in right buffer: {}", index).as_str(),
+                    )
+                    .unwrap();
+                    self.rightbuffer = self.rightbuffer.drain(real_index..).collect::<String>();
+                }
+                _ => super::debug::debug_message("found space in right buffer").unwrap(),
+            }
+        }
+    }
+
     pub fn left_word(&self) -> Option<u16> {
         if self.position.x() == 0 {
             None
         } else {
-            let substring = self
-                .collect()
-                .drain(0..self.position.x as usize)
-                .collect::<String>()
-                .trim()
-                .to_string();
+            let mut c = Vec::new();
+            self.collect().split(' ').fold(0, |mut acc, value| {
+                c.push(acc);
+                acc += value.to_string().len();
+                acc
+            });
 
-            match substring.rfind(' ') {
-                None => Some(0),
-                Some(index) => Some(2 + index as u16),
+            let collection = self.collect();
+            let char_indeces = collection
+                .chars()
+                .enumerate()
+                .filter(|(_, c)| *c == ' ')
+                .collect::<Vec<_>>();
+
+            let mut res = vec![0];
+            char_indeces.iter().for_each(|(i, _)| {
+                let chars = collection.chars().collect::<Vec<_>>();
+                if chars.len() > i + 1 {
+                    let next = chars[i + 1];
+                    if next != ' ' {
+                        res.push(i + 1);
+                    }
+                }
+            });
+            match res
+                .iter()
+                .filter(|&&i| i < self.position.x() as usize)
+                .max()
+            {
+                Some(i) => Some(*i as u16),
+                _ => None,
             }
+        }
+    }
+    pub fn right_word(&self) -> Option<u16> {
+        let mut c = Vec::new();
+        self.collect().split(' ').fold(0, |mut acc, value| {
+            c.push(acc);
+            acc += value.to_string().len();
+            acc
+        });
+
+        let collection = self.collect();
+        let char_indeces = collection
+            .chars()
+            .enumerate()
+            .filter(|(_, c)| *c == ' ')
+            .collect::<Vec<_>>();
+
+        let mut res = vec![0];
+        char_indeces.iter().for_each(|(i, _)| {
+            let chars = collection.chars().collect::<Vec<_>>();
+            if chars.len() > i + 1 {
+                let next = chars[i + 1];
+                if next != ' ' {
+                    res.push(i + 1);
+                }
+            }
+        });
+        match res
+            .iter()
+            .filter(|&&i| i > self.position.x() as usize)
+            .min()
+        {
+            Some(i) => Some(*i as u16),
+            _ => Some(self.length() as u16),
         }
     }
 }

@@ -205,7 +205,7 @@ fn backspace(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
-        line.delete_left()?;
+        line.delete_left();
         line.display()?;
         debug_line(line)?;
         debug_event(event)?;
@@ -232,7 +232,21 @@ fn prompt() -> io::Result<()> {
 
     Ok(())
 }
-
+fn control_d(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('d'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::CONTROL,
+        ..
+    }) = event
+    {
+        line.delete_right();
+        line.display()?;
+        debug_line(line)?;
+        debug_event(event)?;
+    }
+    Ok(())
+}
 // MOD/ALT
 fn alt_b(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     if let Event::Key(KeyEvent {
@@ -245,16 +259,47 @@ fn alt_b(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         match line.left_word() {
             None => debug_message("Could not move back word")?,
             Some(x) => {
-                if x == 0 {
-                    line.set_position_x(x);
-                    io::stdout().execute(cursor::MoveTo(x + 2, line.position.y()))?;
-                } else {
-                    line.set_position_x(x + 1);
-                    io::stdout().execute(cursor::MoveTo(x + 1, line.position.y()))?;
-                }
-                debug_message("Moved back word")?;
+                line.set_position_x(x);
+                io::stdout().execute(cursor::MoveTo(x + 2, line.position.y()))?;
+                debug_line(line)?;
+                debug_event(event)?;
             }
         }
+    }
+    Ok(())
+}
+fn alt_f(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('f'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::ALT,
+        ..
+    }) = event
+    {
+        match line.right_word() {
+            None => debug_message("Could not move forward word")?,
+            Some(x) => {
+                line.set_position_x(x);
+                io::stdout().execute(cursor::MoveTo(x + 2, line.position.y()))?;
+                debug_line(line)?;
+                debug_event(event)?;
+            }
+        }
+    }
+    Ok(())
+}
+fn alt_d(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('d'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::ALT,
+        ..
+    }) = event
+    {
+        line.delete_word_right();
+        line.display()?;
+        debug_line(line)?;
+        debug_event(event)?;
     }
     Ok(())
 }
@@ -277,12 +322,15 @@ pub fn read_char() -> io::Result<()> {
                 regular_character(&event, &mut line)?;
                 backspace(&event, &mut line)?;
                 alt_b(&event, &mut line)?;
+                alt_f(&event, &mut line)?;
+                alt_d(&event, &mut line)?;
                 control_k(&event, &mut line)?;
                 control_l(&event, &mut line)?;
                 control_a(&event, &mut line)?;
                 control_e(&event, &mut line)?;
                 control_b(&event, &mut line)?;
                 control_f(&event, &mut line)?;
+                control_d(&event, &mut line)?;
                 match parse_line(&event, &mut line) {
                     Err(..) => break,
                     _ => (),
