@@ -18,6 +18,8 @@ fn regular_character(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     }) = event
     {
         line.add_char(c.clone())?;
+        debug_line(line)?;
+        debug_event(event)?;
     }
 
     Ok(())
@@ -30,12 +32,18 @@ fn control_l(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
+        line.set_position_start_x();
+        line.set_position_start_y();
         line.clear();
+
         io::stdout().execute(cursor::MoveTo(0, 0))?;
         io::stdout().execute(terminal::Clear(ClearType::All))?;
         print!("\r> ");
         io::stdout().flush()?;
-        line.set_position(2, 0);
+        line.set_position_start_x();
+        line.set_position_start_y();
+        debug_line(line)?;
+        debug_event(event)?;
     }
 
     Ok(())
@@ -48,16 +56,11 @@ fn control_k(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
-        match cursor::position() {
-            Ok((_, y)) => {
-                io::stdout().execute(cursor::MoveTo(2, y))?;
-                io::stdout().execute(terminal::Clear(ClearType::UntilNewLine))?;
-                line.update_position(0, y);
-                line.clear();
-                line.display()?;
-            }
-            _ => (),
-        }
+        io::stdout().execute(terminal::Clear(ClearType::UntilNewLine))?;
+        line.clear_rightbuffer();
+        line.display()?;
+        debug_line(line)?;
+        debug_event(event)?;
     }
 
     Ok(())
@@ -70,19 +73,26 @@ fn control_a(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
+        io::stdout().execute(cursor::MoveTo(2, line.position.y()))?;
+        line.set_position_start_x();
         debug_line(line)?;
-        match cursor::position() {
-            Ok((_, y)) => {
-                io::stdout().execute(cursor::MoveTo(0, y))?;
-                io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
-                print!("\r> ");
-                io::stdout().flush()?;
-                line.update_position(2, y);
-                line.display()?;
-                debug_line(line)?;
-            }
-            _ => (),
-        }
+        debug_event(event)?;
+    }
+
+    Ok(())
+}
+fn control_e(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
+    if let Event::Key(KeyEvent {
+        code: KeyCode::Char('e'),
+        kind: KeyEventKind::Release,
+        modifiers: KeyModifiers::CONTROL,
+        ..
+    }) = event
+    {
+        line.set_position_end();
+        io::stdout().execute(cursor::MoveTo(line.length() as u16, line.position.y()))?;
+        debug_line(line)?;
+        debug_event(event)?;
     }
 
     Ok(())
@@ -95,8 +105,6 @@ fn control_b(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
-        debug_line(line)?;
-        debug_event(event)?;
         match cursor::position() {
             Ok((x, y)) => {
                 if x > 2 {
@@ -104,9 +112,13 @@ fn control_b(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
                     io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
                     print!("\r> ");
                     io::stdout().flush()?;
-                    line.left();
+                    match line.move_left() {
+                        false => debug_message("Cannot move left")?,
+                        true => (),
+                    }
                     line.display()?;
                     debug_line(line)?;
+                    debug_event(event)?;
                 }
             }
             _ => (),
@@ -122,8 +134,6 @@ fn control_f(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
-        debug_line(line)?;
-        debug_event(event)?;
         match cursor::position() {
             Ok((x, y)) => {
                 if x > 2 {
@@ -131,9 +141,13 @@ fn control_f(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
                     io::stdout().execute(terminal::Clear(ClearType::CurrentLine))?;
                     print!("\r> ");
                     io::stdout().flush()?;
-                    line.right();
+                    match line.move_right() {
+                        true => (),
+                        false => debug_message("could not move right")?,
+                    }
                     line.display()?;
                     debug_line(line)?;
+                    debug_event(event)?;
                 }
             }
             _ => (),
@@ -152,6 +166,7 @@ fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         match my_parser::parse(line.collect()) {
             Err(result) => {
                 if result == "quit" {
+                    parse_result += "";
                     debug_message("Quit")?;
                     return Err(io::Error::from(io::ErrorKind::Interrupted));
                 } else {
@@ -165,13 +180,14 @@ fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         if parse_result.trim() == "" {
             parse_result = String::from("Could not parse\n");
         }
-
         print!("\n\r{}\r> ", parse_result);
         line.clear();
         line.position_down();
         if parse_result.contains("\n") {
             line.position_down();
         }
+        debug_line(line)?;
+        debug_event(event)?;
         io::stdout().flush()?;
     }
     Ok(())
@@ -185,6 +201,8 @@ fn backspace(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     {
         line.delete_left()?;
         line.display()?;
+        debug_line(line)?;
+        debug_event(event)?;
     }
 
     Ok(())
@@ -214,8 +232,8 @@ pub fn read_char() -> io::Result<()> {
     prompt()?;
 
     let (x, y) = match cursor::position() {
-        Ok((_x, _y)) => (_x, _y),
-        _ => (2, 0),
+        Ok((_, y)) => (0, y),
+        _ => (0, 0),
     };
     let mut line = CurrentLine::new(x, y);
 
@@ -228,6 +246,7 @@ pub fn read_char() -> io::Result<()> {
                 control_k(&event, &mut line)?;
                 control_l(&event, &mut line)?;
                 control_a(&event, &mut line)?;
+                control_e(&event, &mut line)?;
                 control_b(&event, &mut line)?;
                 control_f(&event, &mut line)?;
                 match parse_line(&event, &mut line) {
