@@ -4,7 +4,6 @@ use crossterm::{
     ExecutableCommand,
 };
 use std::io::{self, Write};
-
 #[derive(Debug)]
 pub struct Position {
     x: u16,
@@ -41,12 +40,12 @@ impl Position {
         self.y += 1;
     }
 }
-
 #[derive(Debug)]
 pub struct CurrentLine {
     pub position: Position,
     leftbuffer: String,
     rightbuffer: String,
+    history: Vec<String>,
 }
 impl CurrentLine {
     #[allow(dead_code)]
@@ -68,6 +67,7 @@ impl CurrentLine {
             position: Position { x, y },
             leftbuffer: String::new(),
             rightbuffer: String::new(),
+            history: Vec::new(),
         }
     }
 
@@ -107,6 +107,35 @@ impl CurrentLine {
 
     pub fn clear_rightbuffer(&mut self) {
         self.rightbuffer = String::new();
+    }
+
+    pub fn push_rightbuffer_to_history(&mut self) {
+        self.history.push(self.rightbuffer.clone());
+        if self.history.len() > 0 {
+            let last: usize = self.history.len() - 1;
+            match super::debug::debug_message(self.history[last].as_str()) {
+                _ => (),
+            }
+        }
+    }
+
+    pub fn push_right_word_to_history(&mut self) {
+        if self.rightbuffer.len() > 0 {
+            match self.rightbuffer.find(' ') {
+                Some(index) => {
+                    let mut real_index = index;
+                    while real_index < self.rightbuffer.len() {
+                        if self.rightbuffer.chars().nth(real_index) != Some(' ') {
+                            break;
+                        }
+                        real_index += 1;
+                    }
+                    self.history
+                        .push(self.rightbuffer.drain(0..real_index).collect::<String>());
+                }
+                _ => (),
+            }
+        }
     }
 
     pub fn set_position_start_x(&mut self) {

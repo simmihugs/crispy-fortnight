@@ -60,6 +60,7 @@ fn control_k(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     }) = event
     {
         io::stdout().execute(terminal::Clear(ClearType::UntilNewLine))?;
+        line.push_rightbuffer_to_history();
         line.clear_rightbuffer();
         line.display()?;
         debug_line(line)?;
@@ -158,6 +159,7 @@ fn control_f(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     }
     Ok(())
 }
+
 fn parse_line(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
     if let Event::Key(KeyEvent {
         code: KeyCode::Enter,
@@ -302,6 +304,7 @@ fn alt_d(event: &Event, line: &mut CurrentLine) -> io::Result<()> {
         ..
     }) = event
     {
+        line.push_right_word_to_history();
         line.delete_word_right();
         line.display()?;
         debug_line(line)?;
